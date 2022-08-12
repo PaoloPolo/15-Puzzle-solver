@@ -24,9 +24,9 @@
 (defun allowed-moves (posn)
   (let ((elements))
     (when (not (= (state-position-x posn) 0)) (push 'Left elements))
-    (when (not (= (state-position-x posn) 3)) (push 'Right elements))
+    (when (not (= (state-position-x posn) (1- *side-length*))) (push 'Right elements))
     (when (not (= (state-position-y posn) 0)) (push 'Up elements))
-    (when (not (= (state-position-y posn) 3)) (push 'Down elements))
+    (when (not (= (state-position-y posn) (1- *side-length*))) (push 'Down elements))
     elements))
 
 
