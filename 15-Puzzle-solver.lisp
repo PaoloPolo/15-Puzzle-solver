@@ -4,7 +4,7 @@
 
 (defparameter *initial-state* '(8 4 9 7 3 10 14 15 6 12 1 2 5 11 13 0))
 
-(defparameter *test-state* '(15 14 1 6 9 11 4 12 0 10 7 3 13 8 5 2))
+(defparameter *test-state* '(0 12 9 13 15 11 10 14 3 7 2 5 4 8 6 1))
 
 (defparameter *goal-state* '(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0))
 
@@ -36,12 +36,14 @@
 
 
 (defun member-sublist (item list)
+  "Check if the given item is an item of a sublist of the given list"
   (loop for sublist in list
 	if (member item sublist)
 	  return T
 	finally (return Nil)))
 
 (defun cycles (state)
+  "Break the permutation up into disjoint cycles"
   (let ((cycles))
     (loop for item in state
 	  do (when (not (member-sublist item cycles))
@@ -54,10 +56,14 @@
     cycles))
 
 (defun number-transm (state)
+  "Get the number of transmutations needed to represent the permutation"
     (loop for cycle in (cycles state)
 	  if (> (length cycle) 1)
 	    sum (1- (length cycle)) into num-transm
 	  finally (return num-transm)))
 
 (defun solvable-p (state)
-  (evenp (+ (number-transm *goal-state*) (number-transm state))))
+  "Check if the state is solvable, if not, the program does not have to proceed"
+  (evenp (number-transm state)))
+
+
