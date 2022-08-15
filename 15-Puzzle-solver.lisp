@@ -18,8 +18,8 @@
 (defun get-position (state)
   "Get the position of the empty field in the given state"
   (setq posn (make-state-position
-	      :x (floor (position 0 state) *side-length*)
-	      :y (mod (position 0 state) *side-length*)
+	      :x (mod (position 0 state) *side-length*)
+	      :y (floor (position 0 state) *side-length*)
 	      )))
 
 (defun allowed-moves (state)
@@ -85,7 +85,7 @@
 
 (defstruct node
   (state '())
-  (path-cost 999999 :type fixnum)
+  (path-cost 0 :type fixnum)
   (heur-cost 0 :type fixnum)
   (parent '()))
 
@@ -98,7 +98,7 @@
 
 (defun sort-queue (node-1 node-2)
   "Sort the queue by the total cost of the nodes"
-  (if (> (total-cost node-1) (total-cost node-2))
+  (if (> (node-heur-cost node-1) (node-heur-cost node-2))
       'T
       'Nil))
 
@@ -122,30 +122,48 @@
 (defun get-next-nodes (node)
   (let ((state (node-state node)))
     (mapcar #'(lambda (move) (let ((next-node (make-node)))
-			       (setf (node-state next-node) (get-next-state move state))
-			       next-node))
+			      (setf (node-state next-node) (get-next-state move state))
+			      next-node))
 	    (allowed-moves state))
     )
   )
 
-(defun neighbor-function (next-node current-node heuristic)
-  (let ((current-path-cost (1+ (node-path-cost current-node))))
-    (when (< current-path-cost (node-path-cost next-node))
-      (setf (node-parent next-node) current-node)
-      (setf (node-path-cost next-node) current-path-cost)
-      (setf (node-heur-cost next-node) (funcall heuristic (node-state next-node)))
-      (when (not (find next-node *queue* :test #'equalp))
-	(add-nodes-queue next-node)))))
+(defparameter *closed* (make-array 1 :adjustable t :fill-pointer 0))
+
+(defun neighbor-function (node heuristic)
+  (mapcar #'(lambda (next-node) (let ((cost (1+ (node-path-cost node))))
+				  (when (and (find next-node *queue* :test #'equalp) (< cost (node-path-cost next-node)))
+				    (setf *queue* (remove next-node *queue*)))
+				  (when (and (find next-node *closed* :test #'equalp) (< cost (node-path-cost next-node)))
+				    (setf *closed* (remove next-node *closed*)))
+				  (when (not (or (find next-node *queue*) (find next-node *closed*)))
+				    (setf (node-path-cost next-node) cost)
+				    (setf (node-parent next-node) (make-node :state (node-state node) :heur-cost (node-heur-cost node) :path-cost (node-path-cost node)))
+				    (setf (node-heur-cost next-node) (funcall heuristic (node-state next-node)))
+				    (add-nodes-queue next-node))
+				  )
+	      )
+	  (get-next-nodes node))
+  )
+
+(defun heuristic (state)
+  (loop for item in state
+	when (not (= item (nth (position item state) *goal-state*)))
+	  sum 1 into heur
+	finally (return heur)))
 
 (defun A-Star (start goal heuristic)
   (add-nodes-queue start)
   (loop	until (= (length *queue*) 0)
 	do
 	   (let ((current-node (vector-pop *queue*)))
-	     
-	     (when (equalp goal current-node)
-	       (return (return-path start current-node)))
-	     (mapcar #'(lambda (next-node) (neighbor-function next-node current-node heuristic)) (get-next-nodes current-node))
+	     (cond
+	       ((not (equalp (node-state current-node) (node-state goal)))
+		(print current-node)
+		(vector-push-extend current-node *closed*)
+		(neighbor-function current-node heuristic))
+	       (t (return Nil))
+	       )
 	     )
 	)
   )
