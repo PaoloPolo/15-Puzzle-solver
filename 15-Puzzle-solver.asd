@@ -7,4 +7,5 @@
   :version "0.0.1"
   :serial t
   :components ((:file "package")
-               (:file "15-Puzzle-solver")))
+               (:file "15-Puzzle-solver")
+	       (:file "heap")))
