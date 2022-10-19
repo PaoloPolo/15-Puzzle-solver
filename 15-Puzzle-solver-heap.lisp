@@ -1,7 +1,7 @@
 ;(in-package #:15-Puzzle-solver)
 
-(defparameter *test-state* #(15 14 1 6 9 11 4 12 0 10 7 3 13 8 5 2))
-(defparameter *goal-state* #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0))
+(defparameter *test-state* #(1 8 2 0 4 3 7 6 5))
+(defparameter *goal-state* #(1 2 3 4 5 6 7 8 0))
 
 (defstruct heap-node
   "Struct representing a single node in the binary heap (used for sorting)"
@@ -31,9 +31,9 @@
 	  do (when (not (member-sublist item cycle-list))
 	       (let ((current item)
 		     (cycle))
-		 (loop while (not (member current cycle))
+		 (loop until (member current cycle)
 		       do (push current cycle)
-			  (setf current (elt goal-state (position current state))))
+			  (setf current (aref goal-state (position current state))))
 		 (push cycle cycle-list))))
     cycle-list))
 
@@ -65,9 +65,9 @@
 	sum (manh-distance item state goal-state side-length) into total
 	finally (return total)))
 
-(defun solvable-p (state goal-state side-length)
+(defun solvable-p (free-space state goal-state side-length)
   "Returns if the puzzle is solvable"
-  (evenp (+ (manh-distance 0 state goal-state side-length)
+  (evenp (+ (manh-distance free-space state goal-state side-length)
 	    (num-transpositions state goal-state))))
 
 	     
@@ -113,12 +113,21 @@
 	      (get-next-state move state side-length))
  	  (allowed-moves state side-length)))
 
-(defun A-Star (start-state goal-state side-length heuristic)
+(defun prune-open-list (new-size open-list open-list-hash compare-fn &key key)
+  "Return a pruned heap that has the given size"
+  (let ((new-heap (make-heap compare-fn :key key)))
+    (dotimes (temp new-size)
+      (insert-heap (remove-heap open-list) new-heap))
+    (dotimes (temp (get-heap-size open-list))
+      (when ))
+    new-heap))
+
+(defun A-Star (free-space start-state goal-state side-length heuristic)
   "Perform an A-Star search for the given start to the given end-node with the given heuristic function"
   (let ((open-list-hash (make-hash-table :test #'equalp :size 100000 :rehash-size 2.0))
 	(open-list (make-heap #'< :key #'heap-node-total-cost))
 	(closed-list-hash (make-hash-table :test #'equalp :size 100000 :rehash-size 2.0)))
-    (when (solvable-p start-state goal-state side-length)
+    (when (solvable-p free-space start-state goal-state side-length)
       (flet ((successor-fn (current-state successor-state successor-g)
 	       (setf (gethash successor-state open-list-hash)
 		     (make-hash-node :parent-state current-state
