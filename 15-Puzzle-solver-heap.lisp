@@ -1,19 +1,19 @@
 ;(in-package #:15-Puzzle-solver)
 
-(defparameter *test-state* #(1 8 2 0 4 3 7 6 5))
+(defparameter *test-state* #(8 6 7 2 5 4 3 0 1))
 (defparameter *goal-state* #(1 2 3 4 5 6 7 8 0))
 
 (defstruct heap-node
   "Struct representing a single node in the binary heap (used for sorting)"
   (state #()
-   :type vector)
+   :type simple-vector)
   (total-cost 0
    :type fixnum))
 
 (defstruct hash-node
   "Struct representing a single node in a hash-map"
-  (parent-state #()
-   :type vector)
+  (parent #()
+   :type simple-vector)
   (path-cost 0
    :type fixnum))
 
@@ -66,16 +66,22 @@
 	finally (return total)))
 
 (defun solvable-p (free-space state goal-state side-length)
-  "Returns if the puzzle is solvable"
-  (evenp (+ (manh-distance free-space state goal-state side-length)
-	    (num-transpositions state goal-state))))
+  "Returns if every item is present only once and if the puzzle is solvable in general"
+  (and (every #'(lambda (item)
+		  (= 1 (count item state)))
+	      state)
+       (every #'(lambda (item)
+		  (= 1 (count item goal-state)))
+	      goal-state)
+       (evenp (+ (manh-distance free-space state goal-state side-length)
+		 (num-transpositions state goal-state)))))
 
 	     
 (declaim (inline allowed-moves))
-(defun allowed-moves (state side-length)
+(defun allowed-moves (state free-space side-length)
   "Return a list of allowed moves"
   (let ((elements)
-	(posn (get-position 0 state side-length)))
+	(posn (get-position free-space state side-length)))
     (unless (= (getf posn :x) 1)
       (push 'Left elements))
     (unless (= (getf posn :x) side-length)
@@ -87,9 +93,9 @@
     elements))
 
 (declaim (inline get-next-state))
-(defun get-next-state (movement state side-length)
+(defun get-next-state (movement free-space state side-length)
   "Get the next state for any given move and state"
-  (let ((posn (position 0 state))
+  (let ((posn (position free-space state))
 	(next-state (copy-seq state)))
     (cond
       ((equalp movement 'Up)
@@ -107,20 +113,40 @@
     next-state))
 
 (declaim (inline get-successors))
-(defun get-successors (state side-length)
+(defun get-successors (state free-space side-length)
   "Get all successors of one node"
   (mapcar #'(lambda (move)
-	      (get-next-state move state side-length))
- 	  (allowed-moves state side-length)))
+	      (get-next-state move free-space state side-length))
+ 	  (allowed-moves state free-space side-length)))
 
-(defun prune-open-list (new-size open-list open-list-hash compare-fn &key key)
-  "Return a pruned heap that has the given size"
-  (let ((new-heap (make-heap compare-fn :key key)))
-    (dotimes (temp new-size)
-      (insert-heap (remove-heap open-list) new-heap))
-    (dotimes (temp (get-heap-size open-list))
-      (when ))
-    new-heap))
+(defun build-path (start-state goal-node closed-list-hash)
+  "Return the path from the start state to the goal state"
+  (let ((path '())
+	(current-node (gethash (heap-node-state goal-node) closed-list-hash)))
+    (push (heap-node-state goal-node) path)
+    (loop
+      (push (hash-node-parent current-node) path)
+      (when (equalp (hash-node-parent current-node) start-state)
+	(return (reverse path)))
+      (setf current-node (gethash (hash-node-parent current-node) closed-list-hash)))))
+
+(defun build-moves (start-state goal-node free-space side-length closed-list-hash)
+  "Returns the needed moves for reaching the goal-state"
+  (let ((path (build-path start-state goal-node closed-list-hash))
+	(moves '()))
+    (dotimes (i (1- (length path)))
+      (let ((posn-state (position free-space (nth i path)))
+	    (posn-next (position free-space (nth (1+ i) path))))
+	(cond
+	  ((= (+ posn-state side-length) posn-next)
+	   (push 'Up moves))
+	  ((= (1+ posn-state) posn-next)
+	   (push 'Right moves))
+	  ((= (- posn-state side-length) posn-next)
+	   (push 'Down moves))
+	  ((= (1- posn-state) posn-next)
+	   (push 'Left moves)))))
+    (reverse moves)))
 
 (defun A-Star (free-space start-state goal-state side-length heuristic)
   "Perform an A-Star search for the given start to the given end-node with the given heuristic function"
@@ -130,7 +156,7 @@
     (when (solvable-p free-space start-state goal-state side-length)
       (flet ((successor-fn (current-state successor-state successor-g)
 	       (setf (gethash successor-state open-list-hash)
-		     (make-hash-node :parent-state current-state
+		     (make-hash-node :parent current-state
 				     :path-cost successor-g))
 	       (insert-heap (make-heap-node :state
 					    successor-state
@@ -138,24 +164,23 @@
 					    (+ successor-g
 					       (funcall heuristic successor-state goal-state side-length)))
 			    open-list)))
-	(insert-heap
-	 (make-heap-node :state start-state 
-			 :total-cost 0)
-	 open-list)
-	(setf (gethash start-state open-list-hash) (make-hash-node :parent-state #()
-								   :path-cost 0))
 	(loop for current-node = (remove-heap open-list)
  	      for current-state = (heap-node-state current-node)
+		initially (progn
+			    (insert-heap
+			     (make-heap-node :state start-state 
+					     :total-cost 0)
+			     open-list)
+			    (setf (gethash start-state open-list-hash) (make-hash-node :parent #()
+										       :path-cost 0)))
 	      until (or (= (hash-table-count open-list-hash) 0)
-			nil)
+			(equalp current-state goal-state))
 	      do
-		 (when (equalp current-state goal-state)
-		   (return closed-list-hash))
 		 (unless (gethash current-state closed-list-hash)
 		   (let ((successor-g (1+ (hash-node-path-cost (gethash current-state open-list-hash)))))
 		     (setf (gethash current-state closed-list-hash) (gethash current-state open-list-hash))
 		     (remhash current-state open-list-hash)
-		     (dolist (successor-state (get-successors current-state side-length))
+		     (dolist (successor-state (get-successors current-state free-space side-length))
 		       (cond
 			 ((gethash successor-state closed-list-hash))
 			 ((gethash successor-state open-list-hash)
@@ -166,6 +191,22 @@
 			  (successor-fn current-state successor-state successor-g)))
 		       (when (equalp successor-state goal-state)
 			 (setf (gethash successor-state closed-list-hash)
-			       (make-hash-node :parent-state current-state
-					       :path-cost successor-g)))))))))))
+			       (make-hash-node :parent current-state
+					       :path-cost successor-g))))))
+	      finally (when (equalp current-state goal-state)
+			(return (build-moves start-state current-node free-space side-length closed-list-hash))))))))
 
+(defmacro with-timing (&body function-forms)
+  "Return the time spent in the called function (ratio) and the return-value of the function"
+  (let ((start-time (gensym))
+	(end-time (gensym))
+	(return-value (gensym)))
+    `(let* ((,start-time (get-internal-real-time))
+	    (,return-value (progn ,@function-forms))
+	    (,end-time (get-internal-real-time)))
+       (values ,return-value (/ (- ,end-time ,start-time) internal-time-units-per-second)))))
+ 
+(defun solve-puzzle (start-state goal-state side-length heuristic &key (free-space 0 ))
+  "Solve the puzzle by using the A-Star algorithm"
+  (multiple-value-bind (return-value time-ratio)
+      (with-timing (A-Star free-space start-state goal-state side-length heuristic))))
