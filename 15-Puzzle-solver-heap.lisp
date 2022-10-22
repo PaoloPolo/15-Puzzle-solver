@@ -1,7 +1,7 @@
 ;(in-package #:15-Puzzle-solver)
 
-(defparameter *test-state* #(8 6 7 2 5 4 3 0 1))
-(defparameter *goal-state* #(1 2 3 4 5 6 7 8 0))
+(defparameter *test-state* #(1 2 3 4 15 14 13 12 11 10 9 8 7 6 5 0))
+(defparameter *goal-state* #(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 0))
 
 (defstruct heap-node
   "Struct representing a single node in the binary heap (used for sorting)"
@@ -24,7 +24,7 @@
     (when (member item sublist)
       (return 'T))))
 
-(defun cycles (state &key (goal-state *goal-state*))
+(defun cycles (state goal-state)
   "Get the disjoint cycles of one permutation"
   (let ((cycle-list))
     (loop for item across state
@@ -39,7 +39,7 @@
 
 (defun num-transpositions (state goal-state)
   "Get the number of transpositions needed to represent the disjoint cycles of the permutation"
-    (loop for cycle in (cycles state :goal-state goal-state)
+    (loop for cycle in (cycles state goal-state)
 	  if (> (length cycle) 1)
 	    sum (1- (length cycle)) into number
 	  finally (return number)))
@@ -67,7 +67,9 @@
 
 (defun solvable-p (free-space state goal-state side-length)
   "Returns if every item is present only once and if the puzzle is solvable in general"
-  (and (every #'(lambda (item)
+  (and (= (length state) (expt side-length 2))
+       (= (length goal-state) (expt side-length 2))
+       (every #'(lambda (item)
 		  (= 1 (count item state)))
 	      state)
        (every #'(lambda (item)
@@ -139,13 +141,13 @@
 	    (posn-next (position free-space (nth (1+ i) path))))
 	(cond
 	  ((= (+ posn-state side-length) posn-next)
-	   (push 'Up moves))
+	   (push "Up" moves))
 	  ((= (1+ posn-state) posn-next)
-	   (push 'Right moves))
+	   (push "Right" moves))
 	  ((= (- posn-state side-length) posn-next)
-	   (push 'Down moves))
+	   (push "Down" moves))
 	  ((= (1- posn-state) posn-next)
-	   (push 'Left moves)))))
+	   (push "Left" moves)))))
     (reverse moves)))
 
 (defun A-Star (free-space start-state goal-state side-length heuristic)
@@ -207,6 +209,12 @@
        (values ,return-value (/ (- ,end-time ,start-time) internal-time-units-per-second)))))
  
 (defun solve-puzzle (start-state goal-state side-length heuristic &key (free-space 0 ))
-  "Solve the puzzle by using the A-Star algorithm"
+  "Solve the puzzle by using the A-Star algorithm and print the solution if one was found"
   (multiple-value-bind (return-value time-ratio)
-      (with-timing (A-Star free-space start-state goal-state side-length heuristic))))
+      (with-timing (A-Star free-space start-state goal-state side-length heuristic))
+    (if (not (null return-value))
+	(format t "Solution was found with ~r step~:p in ~F second~:p: ~%~{~a~^, ~}"
+		(length return-value) time-ratio return-value)
+	(format t "No solution was found. Elapsed time is ~F second~:p"
+		time-ratio))
+    (not (null return-value))))
