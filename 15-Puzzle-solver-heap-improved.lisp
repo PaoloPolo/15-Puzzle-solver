@@ -1,6 +1,6 @@
 ;(in-package #:15-Puzzle-solver)
 
-(defparameter *test-state* #(8 6 7 2 5 4 3 0 1))
+(defparameter *test-state* #(1 2 3 4 5 6 7 0 8))
 (defparameter *goal-state* #(1 2 3 4 5 6 7 8 0))
 
 (defstruct node
@@ -75,14 +75,14 @@
 
 (defun solvable-p (free-space state goal-state side-length)
   "Returns if every item is present only once and if the puzzle is solvable in general"
-  (and (= (length state) (expt side-length 2))
-       (= (length goal-state) (expt side-length 2))
-       (every #'(lambda (item)
-		  (= 1 (count item state)))
-	      state)
-       (every #'(lambda (item)
-		  (= 1 (count item goal-state)))
-	      goal-state)
+  (and (every #'identity
+	      (mapcar #'(lambda (curr-state)
+			  (and (= (length curr-state) (expt side-length 2))
+			       (every #'(lambda (item)
+					  (= 1 (count item curr-state)))
+				      curr-state)
+			       (= 1 (count free-space curr-state))))
+		      (list state goal-state)))
        (evenp (+ (manh-distance free-space state goal-state side-length)
 		 (num-transpositions state goal-state)))))
 	     
@@ -145,22 +145,21 @@
 	(return path))
       (setf parent (gethash parent closed-list)))))
 
-(defun build-moves (start-state goal-state free-space side-length closed-list)
+(defun build-moves (free-space side-length path)
   "Returns the needed moves for reaching the goal-state"
-  (let ((path (build-path start-state goal-state closed-list))
-	(moves '()))
+  (let ((moves '()))
     (dotimes (i (1- (length path)))
       (let ((posn-state (position free-space (nth i path)))
 	    (posn-next (position free-space (nth (1+ i) path))))
 	(cond
 	  ((= posn-next (- posn-state side-length))
-	   (push "Up" moves))
+	   (push 'Up moves))
 	  ((= posn-next (1+ posn-state))
-	   (push "Right" moves))
+	   (push 'Right moves))
 	  ((= posn-next (+ posn-state side-length))
-	   (push "Down" moves))
+	   (push 'Down moves))
 	  ((= posn-next (1- posn-state))
-	   (push "Left" moves)))))
+	   (push 'Left moves)))))
     (reverse moves)))
 
 (defun A-Star (free-space start-state goal-state side-length heuristic)
@@ -189,12 +188,10 @@
 		     (setf (gethash (node-state successor-node) closed-list) current-state))))
 	    finally (when (equalp current-state goal-state)
 		      (remove-heap open-list)
-		      (return (list (build-moves start-state
-						   goal-state
-						   free-space
-						   side-length
-						   closed-list)
-				      expanded-nodes)))))))
+		      (return (list (build-path start-state
+						goal-state
+						closed-list)
+				    expanded-nodes)))))))
 
 (defmacro with-timing (&body function-forms)
   "Return the time spent in the called function (ratio) and the return-value of the function"
@@ -205,18 +202,98 @@
 	    (,return-value (progn ,@function-forms))
 	    (,end-time (get-internal-real-time)))
        (values ,return-value (/ (- ,end-time ,start-time) internal-time-units-per-second)))))
- 
-(defun solve-puzzle (start-state goal-state side-length heuristic &key (free-space 0))
+
+(declaim (inline print-state))
+(defun print-state (state side-length)
+  (flet ((print-line ()
+	   (dotimes (i (1+ (* 3 side-length)))
+	     (format t "-"))
+	   (format t "~%"))
+	 (print-items (row)
+	   (format t "|")
+	   (dotimes (i side-length)
+	     (format t "~vd|" 2 (aref state (+ (* row side-length) i))))
+	   (format t "~%")))
+    (print-line)
+    (dotimes (i side-length)
+      (print-items i)
+      (print-line))))
+
+(defun read-state (side-length name)
+  "Read in a state with the given side-length"
+  (format t "Now the ~a state has to be entered~%" name)
+  (format t "The single rows are read in, please enter the numbers divided by one character~%")
+  (let ((temp '()))
+    (dotimes (i side-length)
+      (format t "Please enter the line ~D of your puzzle: " (1+ i))
+      (setq temp (append temp (with-input-from-string (in (read-line))
+				(loop for x = (read in nil nil) while x collect x)))))
+    (coerce temp 'vector)))
+
+(defun solve-puzzle ()
   "Solve the puzzle by using the A-Star algorithm and print the solution if one was found"
-  (multiple-value-bind (return-value time-ratio)
-      (with-timing (A-Star free-space start-state goal-state side-length heuristic))
-    (let ((solution (first return-value))
-	  (expanded-nodes (second return-value)))
-      (if (not (null return-value))
-	  (progn (format t "Solution was found with ~r step~:p in ~F second~:p: ~%~{~a~^, ~}~%"
-			 (length solution) time-ratio solution)
-		 (format t "For the solution ~D node~:p had to be expanded"
-			 expanded-nodes))
-	  (format t "No solution was found. Elapsed time is ~F second~:p"
-		  time-ratio))
-      (not (null return-value)))))
+  (flet ((empty-line () (format t "~%")))
+    (let ((side-length 0)
+	  (start-state)
+	  (goal-state)
+	  (heuristic)
+	  (free-space 0))
+      (loop do
+	(format t "Please enter the side-length of your puzzle: ")
+	(loop for input = (read)
+	      until (and (numberp input)
+			 (> input 1))
+	      finally (setf side-length input))
+	(empty-line)
+	(format t "Please enter the representation of the free space: ")
+	(loop for input = (read)
+	      until (numberp input)
+	      finally (setf free-space input))
+	(empty-line)
+	(setf start-state (read-state side-length "start"))
+	(empty-line)
+	(setf goal-state (read-state side-length "goal"))
+	(empty-line)
+	(format t "Please enter whether you want to use the Manhattan-Distance (MD) or Misplaced Tiles heuristic (MT): ")
+	(loop for input = (read)
+	      until (or (string-equal input "MD")
+			(string-equal input "MT"))
+	      finally (cond ((string-equal input "MD")
+			     (setf heuristic #'sum-manh-distance))
+			    ((string-equal input "MT")
+			     (setf heuristic #'misplaced-tiles))))
+	(empty-line)
+	(if (solvable-p free-space start-state goal-state side-length)
+	    (multiple-value-bind (return-value time-ratio)
+		(with-timing (A-Star free-space start-state goal-state side-length heuristic))
+	      (let* ((path (first return-value))
+		     (solution (build-moves free-space side-length path))
+		     (expanded-nodes (second return-value)))
+		(if (not (null return-value))
+		    (progn (format t "Solution was found with ~r step~:p in ~F second~:p~%"
+				   (length solution) time-ratio)
+			   (format t "For that ~D node~:p had to be expanded.~%" expanded-nodes)
+			   (format t "The step~p needed: ~%~%~{~a~^, ~}~%"
+				   (length solution)
+				   (mapcar #'(lambda (x)
+					       (cond((equalp x 'Up)
+						     "Up")
+						    ((equalp x 'Right)
+						     "Right")
+						    ((equalp x 'Down)
+						     "Down")
+						    ((equalp x 'Left)
+						     "Left")))
+					   solution))
+			   (empty-line)
+			   (when (y-or-n-p
+				  "Should the steps be pretty printed?")
+			     (empty-line)
+			     (dolist (state path)
+			       (print-state state side-length)
+			       (empty-line))))
+		    (format t "The puzzle could not be solved. Elapsed time is ~F second~:p~%"
+			    time-ratio))
+		(not (null return-value))))
+	    (format t "The puzzle is not solvable"))
+	    until (not (y-or-n-p "Do you want to repeat the search?~%"))))))
