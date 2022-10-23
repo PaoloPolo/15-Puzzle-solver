@@ -136,9 +136,9 @@
 	(return path))
       (setf parent (gethash parent closed-list)))))
 
-(defun build-moves (start-state goal-node free-space side-length closed-list)
+(defun build-moves (start-state goal-state free-space side-length closed-list)
   "Returns the needed moves for reaching the goal-state"
-  (let ((path (build-path start-state (node-state goal-node) closed-list))
+  (let ((path (build-path start-state goal-state closed-list))
 	(moves '()))
     (dotimes (i (1- (length path)))
       (let ((posn-state (position free-space (nth i path)))
@@ -179,7 +179,13 @@
 		   (when (equalp (node-state successor-node) goal-state)
 		     (setf (gethash (node-state successor-node) closed-list) current-state))))
 	    finally (when (equalp current-state goal-state)
-		      (return closed-list))))))
+		      (remove-heap open-list)
+		      (return (list (build-moves start-state
+						   goal-state
+						   free-space
+						   side-length
+						   closed-list)
+				      expanded-nodes)))))))
 
 (defmacro with-timing (&body function-forms)
   "Return the time spent in the called function (ratio) and the return-value of the function"
@@ -193,13 +199,15 @@
  
 (defun solve-puzzle (start-state goal-state side-length heuristic &key (free-space 0))
   "Solve the puzzle by using the A-Star algorithm and print the solution if one was found"
-  (multiple-value-bind (return-value time-ratio expanded-nodes)
+  (multiple-value-bind (return-value time-ratio)
       (with-timing (A-Star free-space start-state goal-state side-length heuristic))
-    (if (not (null return-value))
-	(progn (format t "Solution was found with ~r step~:p in ~F second~:p: ~%~{~a~^, ~}"
-		       (length return-value) time-ratio return-value)
-	       (format t "For the solution ~D node~:p had to be expanded"
-		       expanded-nodes))
-	(format t "No solution was found. Elapsed time is ~F second~:p"
-		time-ratio))
-    (not (null return-value))))
+    (let ((solution (first return-value))
+	  (expanded-nodes (second return-value)))
+      (if (not (null return-value))
+	  (progn (format t "Solution was found with ~r step~:p in ~F second~:p: ~%~{~a~^, ~}~%"
+			 (length solution) time-ratio solution)
+		 (format t "For the solution ~D node~:p had to be expanded"
+			 expanded-nodes))
+	  (format t "No solution was found. Elapsed time is ~F second~:p"
+		  time-ratio))
+      (not (null return-value)))))
