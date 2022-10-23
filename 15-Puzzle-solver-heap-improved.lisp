@@ -1,6 +1,6 @@
 ;(in-package #:15-Puzzle-solver)
 
-(defparameter *test-state* #(1 2 3 4 5 6 7 0 8))
+(defparameter *test-state* #(8 6 7 2 5 4 3 0 1))
 (defparameter *goal-state* #(1 2 3 4 5 6 7 8 0))
 
 (defstruct node
@@ -162,7 +162,7 @@
 	   (push 'Left moves)))))
     (reverse moves)))
 
-(defun A-Star (free-space start-state goal-state side-length heuristic)
+(defun A-Star (free-space start-state goal-state side-length heuristic &key (node-maximum nil node-maximum-p))
   "Perform an A-Star search for the given start to the given end-node with the given heuristic function"
   (let ((open-list (make-heap #'< :key #'node-total-cost))
 	(closed-list (make-hash-table :test #'equalp :size 100000 :rehash-size 2.0)))
@@ -171,7 +171,9 @@
 			      :total-cost (funcall heuristic start-state goal-state side-length))
 		   open-list)
       (loop until (or (= (get-heap-size open-list) 0)
-		      (equalp current-state goal-state))
+		      (equalp current-state goal-state)
+		      (and node-maximum-p
+			   (> expanded-nodes node-maximum)))
 	    for current-node = (remove-heap open-list)
  	    for current-state = (node-state current-node)
 	    for expanded-nodes from 1
