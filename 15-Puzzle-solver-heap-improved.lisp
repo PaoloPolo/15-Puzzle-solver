@@ -63,6 +63,16 @@
 	sum (manh-distance item state goal-state side-length) into total
 	finally (return total)))
 
+(declaim (inline misplaced-tiles))
+(defun misplaced-tiles (state goal-state side-length)
+  "Returns the manhattan distance for one item"
+  (declare (ignore side-length))
+  (loop for x across state
+	for y across goal-state
+	when (not (= x y))
+	  sum 1 into misplaced 
+	finally (return misplaced)))
+
 (defun solvable-p (free-space state goal-state side-length)
   "Returns if every item is present only once and if the puzzle is solvable in general"
   (and (= (length state) (expt side-length 2))
@@ -75,7 +85,6 @@
 	      goal-state)
        (evenp (+ (manh-distance free-space state goal-state side-length)
 		 (num-transpositions state goal-state)))))
-
 	     
 (declaim (inline allowed-moves))
 (defun allowed-moves (state free-space side-length)
