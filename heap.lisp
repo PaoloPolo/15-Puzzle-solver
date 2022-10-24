@@ -1,6 +1,6 @@
 ;;;; heap.lisp
 
-;;;;(in-package #:15-Puzzle-solver)
+(in-package #:15-Puzzle-solver)
 
 (defstruct (heap (:constructor %make-heap (compare-fn &key key)))
   "Structure for storing the type (min/max-heap) and heap itself"
