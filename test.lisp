@@ -55,6 +55,7 @@
 		     (list #'sum-manh-distance #'misplaced-tiles))
 	     (format stream "~%~%")))
       (call-a-star :test-state #(1 2 3 4 5 6 0 7 8))
+      (call-a-star :test-state #(0 1 2 5 6 3 4 7 8))
       (call-a-star :test-state #(1 2 3 5 7 0 4 8 6))
       (call-a-star :test-state #(2 5 7 8 4 0 1 3 6))
       (call-a-star :test-state #(8 6 7 2 5 4 3 0 1))
