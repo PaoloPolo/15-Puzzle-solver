@@ -1,4 +1,4 @@
-(in-package :15-Puzzle-solver)
+(in-package :8-Puzzle-solver)
 
 (defun tests ()
   "Do some tests and return the values in the result.txt"

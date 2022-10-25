@@ -1,4 +1,4 @@
-(in-package #:15-Puzzle-solver)
+(in-package #:8-Puzzle-solver)
 
 (defstruct node
   "Struct representing a single node in the binary heap (used for sorting)"
@@ -260,8 +260,9 @@
 	(format t "Please enter whether you want to use the Manhattan-Distance (MD) or Misplaced Tiles heuristic (MT): ")
 	(force-output)
 	(loop for input = (read)
-	      until (or (string-equal input "MD")
-			(string-equal input "MT"))
+	      until (and (not (numberp input))
+			 (or (string-equal input "MD")
+			     (string-equal input "MT")))
 	      finally (cond ((string-equal input "MD")
 			     (setf heuristic #'sum-manh-distance))
 			    ((string-equal input "MT")
