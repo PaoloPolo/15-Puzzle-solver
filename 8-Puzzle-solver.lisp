@@ -159,7 +159,7 @@
 	   (push 'Left moves)))))
     (reverse moves)))
 
-(defun A-Star (free-space start-state goal-state side-length heuristic &key (node-maximum 3500000 node-maximum-p))
+(defun A-Star (free-space start-state goal-state side-length heuristic &key (node-maximum nil node-maximum-p))
   "Perform an A-Star search for the given start to the given end-node with the given heuristic function"
   (let ((open-list (make-heap #'< :key #'node-total-cost))
 	(closed-list (make-hash-table :test #'equalp :size 100000 :rehash-size 1.5)))
@@ -169,7 +169,8 @@
 		   open-list)
       (loop until (or (= (get-heap-size open-list) 0)
 		      (equalp current-state goal-state)
-		      (> expanded-nodes node-maximum))
+		      (and node-maximum-p
+			   (>= expanded-nodes node-maximum)))
 	    for current-node = (remove-heap open-list)
  	    for current-state = (node-state current-node)
 	    for expanded-nodes from 1
@@ -237,7 +238,8 @@
 	  (start-state)
 	  (goal-state)
 	  (heuristic)
-	  (free-space 0))
+	  (free-space 0)
+	  (maximum-nodes))
       (loop do
 	(format t "Please enter the side-length of your puzzle: ")
 	(force-output)
@@ -256,49 +258,68 @@
 	(empty-line)
 	(setf goal-state (read-state side-length "goal"))
 	(empty-line)
-	(format t "Please enter whether you want to use the Manhattan-Distance (MD) or Misplaced Tiles heuristic (MT): ")
-	(force-output)
-	(loop for input = (read)
-	      until (and (not (numberp input))
-			 (or (string-equal input "MD")
-			     (string-equal input "MT")))
-	      finally (cond ((string-equal input "MD")
-			     (setf heuristic #'sum-manh-distance))
-			    ((string-equal input "MT")
-			     (setf heuristic #'misplaced-tiles))))
-	(empty-line)
 	(if (solvable-p free-space start-state goal-state side-length)
-	    (multiple-value-bind (return-value time-ratio)
-		(with-timing (A-Star free-space start-state goal-state side-length heuristic))
-	      (let* ((path (first return-value))
-		     (solution (build-moves free-space side-length path))
-		     (expanded-nodes (second return-value)))
-		(if (not (null return-value))
-		    (progn (format t "Solution was found with ~r step~:p in ~F second~:p~%"
-				   (length solution) time-ratio)
-			   (format t "For that ~D node~:p had to be expanded.~%" expanded-nodes)
-			   (format t "The step~p needed: ~%~%~{~a~^, ~}~%"
-				   (length solution)
-				   (mapcar #'(lambda (x)
-					       (cond((equalp x 'Up)
-						     "Up")
-						    ((equalp x 'Right)
-						     "Right")
-						    ((equalp x 'Down)
-						     "Down")
-						    ((equalp x 'Left)
-						     "Left")))
-					   solution))
-			   (empty-line)
-			   (when (y-or-n-p
-				  "Should the steps be pretty printed?")
+	    (progn
+	      (format t "Please enter whether you want to use the Manhattan-Distance (MD) or Misplaced Tiles heuristic (MT): ")
+	      (force-output)
+	      (loop for input = (read)
+		    until (and (not (numberp input))
+			       (or (string-equal input "MD")
+				   (string-equal input "MT")))
+		    finally (cond ((string-equal input "MD")
+				   (setf heuristic #'sum-manh-distance))
+				  ((string-equal input "MT")
+				   (setf heuristic #'misplaced-tiles))))
+	      (empty-line)
+	      (if (y-or-n-p "Do you want to set a maximum for expanded nodes?")
+		  (loop initially (format t "Please enter a maximum: ")
+			for input = (read)
+			until (and (numberp input)
+				   (> input 0))
+			finally (setf maximum-nodes input))
+		  (setf maximum-nodes nil))
+	      (multiple-value-bind (return-value time-ratio)
+		  (if (not (null maximum-nodes))
+		      (with-timing (A-Star free-space
+					   start-state
+					   goal-state
+					   side-length
+					   heuristic
+					   :node-maximum maximum-nodes))
+		      (with-timing (A-Star free-space
+					   start-state
+					   goal-state
+					   side-length
+					   heuristic)))
+		(let* ((path (first return-value))
+		       (solution (build-moves free-space side-length path))
+		       (expanded-nodes (second return-value)))
+		  (if (not (null return-value))
+		      (progn (format t "Solution was found with ~r step~:p in ~F second~:p~%"
+				     (length solution) time-ratio)
+			     (format t "For that ~D node~:p had to be expanded.~%" expanded-nodes)
+			     (format t "The step~p needed: ~%~%~{~a~^, ~}~%"
+				     (length solution)
+				     (mapcar #'(lambda (x)
+						 (cond((equalp x 'Up)
+						       "Up")
+						      ((equalp x 'Right)
+						       "Right")
+						      ((equalp x 'Down)
+						       "Down")
+						      ((equalp x 'Left)
+						       "Left")))
+					     solution))
 			     (empty-line)
-			     (dolist (state path)
-			       (print-state state side-length)
-			       (empty-line))))
-		    (format t "The puzzle could not be solved. Elapsed time is ~F second~:p~%"
-			    time-ratio))
-		(not (null return-value))))
+			     (when (y-or-n-p
+				    "Should the steps be pretty printed?")
+			       (empty-line)
+			       (dolist (state path)
+				 (print-state state side-length)
+				 (empty-line))))
+		      (format t "The puzzle could not be solved. Elapsed time is ~F second~:p~%"
+			      time-ratio))
+		  (not (null return-value)))))
 	    (progn (format t "The puzzle is not solvable")
 		   (force-output)))
 	    until (not (y-or-n-p "Do you want to repeat the search?~%"))))))
