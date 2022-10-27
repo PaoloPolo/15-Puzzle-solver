@@ -7,7 +7,7 @@
   :version "0.0.1"
   :components ((:file "package")
 	       (:file "heap")
-           (:file "8-Puzzle-solver")
+               (:file "8-Puzzle-solver")
 	       (:file "test"))
   :build-operation "program-op"
   :build-pathname "8-Puzzle-solver"

@@ -159,7 +159,7 @@
 	   (push 'Left moves)))))
     (reverse moves)))
 
-(defun A-Star (free-space start-state goal-state side-length heuristic &key (node-maximum nil node-maximum-p))
+(defun A-Star (free-space start-state goal-state side-length heuristic &key (node-maximum 3500000 node-maximum-p))
   "Perform an A-Star search for the given start to the given end-node with the given heuristic function"
   (let ((open-list (make-heap #'< :key #'node-total-cost))
 	(closed-list (make-hash-table :test #'equalp :size 100000 :rehash-size 1.5)))
@@ -169,8 +169,7 @@
 		   open-list)
       (loop until (or (= (get-heap-size open-list) 0)
 		      (equalp current-state goal-state)
-		      (and node-maximum-p
-			   (> expanded-nodes node-maximum)))
+		      (> expanded-nodes node-maximum))
 	    for current-node = (remove-heap open-list)
  	    for current-state = (node-state current-node)
 	    for expanded-nodes from 1
